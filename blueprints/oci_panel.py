@@ -442,7 +442,7 @@ def login_required(f):
         
         if request.path.startswith('/oci/api/'):
             return jsonify({"error": "用户未登录或API密钥无效"}), 401
-        return redirect(url_for('login'))
+        return redirect(url_for('auth.login'))
     return decorated_function
 
 def oci_clients_required(f):
