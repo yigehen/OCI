@@ -159,7 +159,7 @@ def get_app_api_key():
         return jsonify({'error': '用户未登录'}), 401
     api_key = fetch_api_key()
     if api_key:
-        return jsonify({'api_key': api_key})
+        return jsonify({'api_key_configured': True})
     return jsonify({'error': '未能在服务器上找到或配置API密钥。'}), 500
 
 

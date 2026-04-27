@@ -1272,9 +1272,10 @@ document.addEventListener('DOMContentLoaded', function() {
     async function loadTgConfig() {
         try {
             const config = await apiRequest('/oci/api/tg-config');
-            tgBotTokenInput.value = config.bot_token || '';
+            tgBotTokenInput.value = '';
+            tgBotTokenInput.placeholder = config.bot_token_configured ? '已配置 Bot Token，如需更换请重新输入' : '输入您的 Bot Token';
             tgChatIdInput.value = config.chat_id || '';
-            updateStatCards({ tgConfigured: !!(config.bot_token || config.chat_id) });
+            updateStatCards({ tgConfigured: !!(config.bot_token_configured || config.chat_id) });
         } catch (error) {
             addLog('加载 Telegram 配置失败。', 'warning');
         }
@@ -1283,10 +1284,11 @@ document.addEventListener('DOMContentLoaded', function() {
     async function loadCloudflareConfig() {
         try {
             const config = await apiRequest('/oci/api/cloudflare-config');
-            cloudflareApiTokenInput.value = config.api_token || '';
+            cloudflareApiTokenInput.value = '';
+            cloudflareApiTokenInput.placeholder = config.api_token_configured ? '已配置 API 令牌，如需更换请重新输入' : '输入您的 Cloudflare API Token';
             cloudflareZoneIdInput.value = config.zone_id || '';
             cloudflareDomainInput.value = config.domain || '';
-            updateStatCards({ cloudflareConfigured: !!(config.api_token || config.zone_id || config.domain) });
+            updateStatCards({ cloudflareConfigured: !!(config.api_token_configured || config.zone_id || config.domain) });
         } catch (error) {
             addLog('加载 Cloudflare 配置失败。', 'warning');
         }
@@ -1295,7 +1297,8 @@ document.addEventListener('DOMContentLoaded', function() {
     saveTgConfigBtn.addEventListener('click', async () => {
         const token = tgBotTokenInput.value.trim();
         const chatId = tgChatIdInput.value.trim();
-        if (!token || !chatId) return addLog('Bot Token 和 Chat ID 均不能为空。', 'error');
+        if (!chatId) return addLog('Chat ID 不能为空。', 'error');
+        if (!token) return addLog('如需更新 Bot Token，请重新输入新的 Token。', 'error');
 
         const spinner = saveTgConfigBtn.querySelector('.spinner-border');
         saveTgConfigBtn.disabled = true;
@@ -1318,8 +1321,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const apiToken = cloudflareApiTokenInput.value.trim();
         const zoneId = cloudflareZoneIdInput.value.trim();
         const domain = cloudflareDomainInput.value.trim();
-        if (!apiToken || !zoneId || !domain) {
-            return addLog('Cloudflare API 令牌、Zone ID 和主域名均不能为空。', 'error');
+        if (!zoneId || !domain) {
+            return addLog('Zone ID 和主域名均不能为空。', 'error');
+        }
+        if (!apiToken) {
+            return addLog('如需更新 Cloudflare API 令牌，请重新输入新的令牌。', 'error');
         }
 
         const spinner = saveCloudflareConfigBtn.querySelector('.spinner-border');
@@ -1344,7 +1350,8 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const config = await apiRequest('/oci/api/xui-config');
             xuiManagerUrlInput.value = config.manager_url || '';
-            xuiManagerSecretInput.value = config.manager_secret || '';
+            xuiManagerSecretInput.value = '';
+            xuiManagerSecretInput.placeholder = config.manager_secret_configured ? '已配置通讯密钥，如需更换请重新输入' : '输入 X-UI Manager Pro管理面板首页获取的 XUI_SECRET_KEY';
         } catch (error) {
             addLog('加载 X-UI 配置失败，请检查后端。', 'warning');
         }
@@ -1374,18 +1381,18 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     getApiKeyBtn.addEventListener('click', async () => {
-        addLog('正在获取API密钥...');
+        addLog('正在检查 API 密钥状态...');
         try {
             const data = await apiRequest('/api/get-app-api-key');
-            if (data.api_key) {
-                apiKeyInput.value = data.api_key;
-                navigator.clipboard.writeText(data.api_key).then(() => {
-                    addLog('API密钥已成功复制到剪贴板！', 'success');
-                    getApiKeyBtn.textContent = '已复制!';
-                    setTimeout(() => { getApiKeyBtn.textContent = '获取/复制密钥'; }, 2000);
-                }).catch(() => addLog('自动复制失败，请手动复制。', 'warning'));
+            if (data.api_key_configured) {
+                apiKeyInput.value = '已配置';
+                addLog('API 密钥已在服务端配置。出于安全原因，不再回显或复制明文密钥。', 'success');
+                getApiKeyBtn.textContent = '已检查';
+                setTimeout(() => { getApiKeyBtn.textContent = '检查密钥状态'; }, 2000);
             }
-        } catch (error) {}
+        } catch (error) {
+            addLog('检查 API 密钥状态失败。', 'error');
+        }
     });
 
     async function saveProfile(alias, profileData) {

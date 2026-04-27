@@ -501,7 +501,11 @@ def default_ssh_key_handler():
 @login_required
 def tg_config_handler():
     if request.method == 'GET':
-        return jsonify(load_tg_config())
+        config = load_tg_config()
+        return jsonify({
+            'chat_id': config.get('chat_id', ''),
+            'bot_token_configured': bool(config.get('bot_token')),
+        })
     elif request.method == 'POST':
         data = request.json
         bot_token, chat_id = data.get('bot_token', '').strip(), data.get('chat_id', '').strip()
@@ -514,7 +518,12 @@ def tg_config_handler():
 @login_required
 def cloudflare_config_handler():
     if request.method == 'GET':
-        return jsonify(load_cloudflare_config())
+        config = load_cloudflare_config()
+        return jsonify({
+            'zone_id': config.get('zone_id', ''),
+            'domain': config.get('domain', ''),
+            'api_token_configured': bool(config.get('api_token')),
+        })
     elif request.method == 'POST':
         data = request.json
         api_token = data.get('api_token', '').strip()
@@ -531,7 +540,11 @@ def cloudflare_config_handler():
 @login_required
 def xui_config_handler():
     if request.method == 'GET':
-        return jsonify(load_xui_config())
+        config = load_xui_config()
+        return jsonify({
+            'manager_url': config.get('manager_url', ''),
+            'manager_secret_configured': bool(config.get('manager_secret')),
+        })
     elif request.method == 'POST':
         data = request.json
         url = data.get('manager_url', '').strip()
