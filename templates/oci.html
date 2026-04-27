@@ -1,0 +1,1575 @@
+{% extends "layout.html" %}
+
+{% block title %}OCI 实例管理器 (Web版){% endblock %}
+
+{% block head_extra %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+<style>
+    .oci-shell { display: flex; flex-direction: column; gap: 1.5rem; }
+    .oci-hero {
+        position: relative; overflow: hidden; padding: 2rem; border-radius: 24px;
+        border: 1px solid rgba(249, 115, 22, 0.24);
+        background: radial-gradient(circle at top right, rgba(249, 115, 22, 0.15), transparent 22%),
+                    radial-gradient(circle at left center, rgba(239, 68, 68, 0.12), transparent 26%),
+                    linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(30, 41, 59, 0.9));
+        box-shadow: 0 20px 60px rgba(2, 6, 23, 0.34);
+    }
+    .oci-hero::after { content: ''; position: absolute; inset: auto -40px -40px auto; width: 180px; height: 180px; border-radius: 50%; background: radial-gradient(circle, rgba(249, 115, 22, 0.16), transparent 68%); pointer-events: none; }
+    .oci-badge { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.45rem 0.85rem; border-radius: 999px; border: 1px solid rgba(249, 115, 22, 0.28); background: rgba(249, 115, 22, 0.1); color: #fdba74; font-size: 0.76rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+    .oci-hero-title { font-size: clamp(2rem, 3vw, 3rem); font-weight: 800; color: #f8fafc; margin: 0.9rem 0 0.55rem; }
+    .oci-hero-desc { color: #94a3b8; max-width: 62rem; line-height: 1.8; margin-bottom: 0; }
+    .oci-stat-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+    .oci-stat-card { min-height: 130px; padding: 1.1rem 1.25rem; border-radius: 20px; border: 1px solid rgba(148, 163, 184, 0.12); background: linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(30, 41, 59, 0.84)); box-shadow: 0 14px 36px rgba(2, 6, 23, 0.26); cursor: pointer; transition: outline 0.2s ease; }
+    .oci-stat-card.primary { border-color: rgba(249, 115, 22, 0.24); }
+    .oci-stat-card.info { border-color: rgba(56, 189, 248, 0.22); }
+    .oci-stat-card.success { border-color: rgba(16, 185, 129, 0.22); }
+    .oci-stat-icon { width: 42px; height: 42px; border-radius: 14px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 0.9rem; color: #fff; font-size: 1.05rem; background: linear-gradient(135deg, rgba(234, 88, 12, 0.92), rgba(249, 115, 22, 0.82)); box-shadow: 0 12px 24px rgba(249, 115, 22, 0.2); }
+    .oci-stat-card.info .oci-stat-icon { background: linear-gradient(135deg, rgba(2, 132, 199, 0.92), rgba(56, 189, 248, 0.82)); box-shadow: 0 12px 24px rgba(56, 189, 248, 0.2); }
+    .oci-stat-card.success .oci-stat-icon { background: linear-gradient(135deg, rgba(5, 150, 105, 0.92), rgba(16, 185, 129, 0.82)); box-shadow: 0 12px 24px rgba(16, 185, 129, 0.2); }
+    .oci-stat-label { color: #94a3b8; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.35rem; }
+    .oci-stat-value { color: #f8fafc; font-size: 1.15rem; font-weight: 800; }
+    .oci-stat-sub { color: #64748b; font-size: 0.8rem; margin-top: 0.2rem; }
+    .oci-section-card { border-radius: 22px; overflow: hidden; }
+    .oci-section-card .card-header { padding: 1rem 1.25rem; }
+    .oci-card-title { display: flex; align-items: center; gap: 0.75rem; font-weight: 800; color: #f8fafc; }
+    .oci-card-title i { width: 34px; height: 34px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; background: rgba(249, 115, 22, 0.14); color: #fb923c; }
+    .oci-panel-note { color: #64748b; font-size: 0.82rem; }
+    .connected-profile-card .card { background: rgba(15, 23, 42, 0.58); border: 1px solid rgba(148, 163, 184, 0.12); box-shadow: none; }
+    .connected-profile-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.9rem; }
+    .connected-profile-summary-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.9rem; }
+    .connected-profile-item { min-height: 78px; padding: 0.75rem 0.9rem; border-radius: 16px; border: 1px solid rgba(148, 163, 184, 0.12); background: rgba(15, 23, 42, 0.52); }
+    .connected-profile-item-label { font-size: 0.76rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.45rem; }
+    .connected-profile-item-value { color: #e2e8f0; font-weight: 600; line-height: 1.35; word-break: break-word; font-size: 0.92rem; }
+    .connected-profile-item-value.compact { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .oci-empty-state { border: 1px dashed rgba(148, 163, 184, 0.2); border-radius: 18px; background: rgba(15, 23, 42, 0.42); color: #94a3b8; }
+    .oci-empty-state strong { color: #e2e8f0; }
+    .action-group { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+    .action-group .btn { flex: 1 1 0; min-width: 0; }
+    .oci-log { background: linear-gradient(180deg, rgba(2, 6, 23, 0.98), rgba(15, 23, 42, 0.96)) !important; color: #86efac !important; border-color: rgba(16, 185, 129, 0.16) !important; font-family: ui-monospace, SFMono-Regular, monospace; }
+    .modal-content { background: linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(15, 23, 42, 0.94)); border: 1px solid rgba(148, 163, 184, 0.16); box-shadow: 0 28px 80px rgba(2, 6, 23, 0.5); }
+    .modal-header { border-bottom: 1px solid rgba(148, 163, 184, 0.12); background: rgba(2, 6, 23, 0.24); }
+    .modal-footer { border-top: 1px solid rgba(148, 163, 184, 0.12); background: rgba(2, 6, 23, 0.16); }
+    .oci-modal-lead { color: #94a3b8; font-size: 0.84rem; margin-top: 0.35rem; }
+    .drag-handle { cursor: move; cursor: grab; color: #94a3b8; }
+    .drag-handle:active { cursor: grabbing; }
+    .manage-profile-btn { border-radius: 8px; transition: all 0.2s; }
+    .manage-profile-btn:hover { background: rgba(14, 165, 233, 0.2) !important; border-color: rgba(14, 165, 233, 0.5) !important; transform: translateX(2px); }
+    @media (max-width: 1199.98px) { .oci-stat-grid { grid-template-columns: 1fr 1fr; } .connected-profile-summary, .connected-profile-summary-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 767.98px) { .oci-stat-grid { grid-template-columns: 1fr; } .connected-profile-summary, .connected-profile-summary-3 { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-2 py-lg-3">
+    <div class="oci-shell">
+        <section class="oci-hero">
+            <div class="oci-badge"><i class="bi bi-hdd-network"></i>OCI Snatch Control Plane</div>
+            <h1 class="oci-hero-title">OCI 账户管理平台</h1>
+            <p class="oci-hero-desc">将 OCI 账户管理、抢占任务、网络规则、Cloudflare、TG/API 与实例运维整合进统一的科技控制台。</p>
+        </section>
+
+        <section class="oci-stat-grid">
+            <button type="button" class="oci-stat-card primary text-start border-0 w-100" data-bs-toggle="modal" data-bs-target="#profilesHubModal">
+                <div class="oci-stat-icon"><i class="bi bi-person-workspace"></i></div>
+                <div class="oci-stat-label">账户管理</div>
+                <div class="oci-stat-value" id="profilesStatValue">OCI Profiles</div>
+                <div class="oci-stat-sub" id="profilesStatSub">连接、排序、编辑、代理与密钥管理</div>
+            </button>
+            <button type="button" class="oci-stat-card info text-start border-0 w-100" id="viewSnatchTasksBtn" data-bs-toggle="modal" data-bs-target="#viewSnatchTasksModal">
+                <div class="oci-stat-icon"><i class="bi bi-list-task"></i></div>
+                <div class="oci-stat-label">抢占任务</div>
+                <div class="oci-stat-value" id="snatchStatValue">Snatch Queue</div>
+                <div class="oci-stat-sub" id="snatchStatSub">实时任务、日志、暂停恢复与删除</div>
+            </button>
+            <button type="button" class="oci-stat-card success text-start border-0 w-100" data-bs-toggle="modal" data-bs-target="#networkConfigHubModal">
+                <div class="oci-stat-icon"><i class="bi bi-diagram-3"></i></div>
+                <div class="oci-stat-label">网络与配置</div>
+                <div class="oci-stat-value" id="networkStatValue">Network / Cloudflare / TG</div>
+                <div class="oci-stat-sub" id="networkStatSub">统一管理规则、域名解析与通知能力</div>
+            </button>
+        </section>
+
+        <section class="card oci-section-card connected-profile-card">
+            <div class="card-header d-flex justify-content-between align-items-center gap-3 flex-wrap">
+                <div>
+                    <div class="oci-card-title"><i class="bi bi-person-badge"></i><span>当前连接账户详情</span></div>
+                    <div class="oci-panel-note mt-2">此处仅展示当前已连接 OCI 账户的详情信息，不支持直接编辑。</div>
+                </div>
+                <div class="d-flex gap-2 flex-wrap align-items-center">
+                    <span class="badge bg-primary d-none align-self-center" id="actionAreaProfile"></span>
+                    <button id="manageUsersBtn" class="btn btn-warning btn-sm profile-action-btn text-dark fw-bold" disabled data-bs-toggle="modal" data-bs-target="#userManagementModal">
+                        <i class="bi bi-people-fill"></i> 身份与用户管理
+                    </button>
+                    <button id="createInstanceBtn" class="btn btn-success btn-sm profile-action-btn" disabled data-bs-toggle="modal" data-bs-target="#createLaunchInstanceModal">
+                        <i class="bi bi-plus-circle"></i> 创建 / 抢占实例
+                    </button>
+                    <button id="disconnectAccountBtn" class="btn btn-danger btn-sm profile-action-btn" disabled>
+                        <i class="bi bi-power"></i> 断开连接
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="connectedProfileEmptyState" class="oci-empty-state text-center py-5"><div class="mb-2"><i class="bi bi-person-bounding-box fs-2"></i></div><strong>尚未连接 OCI 账号</strong><div class="small mt-2">请先在“OCI Profiles”弹出窗口中选择并连接一个账号，然后在此查看只读详情。</div></div>
+                <div id="connectedProfileDetails" class="d-none">
+                    
+                    <div class="connected-profile-summary-3 mb-3">
+                        <div class="connected-profile-item">
+                            <div class="connected-profile-item-label">账户名称</div>
+                            <div id="connectedProfileAlias" class="connected-profile-item-value compact" title="-">-</div>
+                        </div>
+                        <div class="connected-profile-item">
+                            <div class="connected-profile-item-label">区域</div>
+                            <div id="connectedProfileRegion" class="connected-profile-item-value compact" title="-">-</div>
+                        </div>
+                        <div class="connected-profile-item">
+                            <div class="connected-profile-item-label">代理</div>
+                            <div id="connectedProfileProxy" class="connected-profile-item-value compact" title="-">-</div>
+                        </div>
+                    </div>
+
+                    <div class="connected-profile-summary-3">
+                        <div class="connected-profile-item">
+                            <div class="connected-profile-item-label">租户名 / 租户 ID</div>
+                            <div id="connectedProfileTenancy" class="connected-profile-item-value compact" title="-">-</div>
+                        </div>
+                        <div class="connected-profile-item">
+                            <div class="connected-profile-item-label">账号 / User</div>
+                            <div id="connectedProfileUser" class="connected-profile-item-value compact" title="-">-</div>
+                        </div>
+                        <div class="connected-profile-item">
+                            <div class="connected-profile-item-label">租户创建时间</div>
+                            <div id="connectedProfileRegDate" class="connected-profile-item-value compact" title="-">-</div>
+                        </div>
+                    </div>
+
+                    <div class="d-none">
+                        <div id="connectedProfileMeta"></div>
+                        <div id="connectedProfileStatusBadge"></div>
+                        <div id="connectedProfileFingerprint"></div>
+                        <div id="connectedProfileSsh"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="card oci-section-card">
+            <div class="card-header d-flex justify-content-between align-items-center gap-3 flex-wrap">
+                <div>
+                    <div class="oci-card-title"><i class="bi bi-server"></i><span>实例列表与运维</span></div>
+                    <div class="oci-panel-note mt-2">支持无感静默刷新、修改实例、附加IP、开关机、终止等操作。</div>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button id="refreshInstancesBtn" class="btn btn-sm btn-primary" disabled>
+                        <i class="bi bi-arrow-clockwise"></i> 刷新列表
+                    </button>
+                    <button id="networkSettingsBtn" class="d-none" type="button" aria-hidden="true" tabindex="-1"></button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width: 20%; text-align: left; padding-left: 1rem;">显示名称</th>
+                                <th class="text-center" style="width: 10%;">状态</th>
+                                <th class="text-center" style="width: 15%;">IPV4</th>
+                                <th class="text-center" style="width: 25%;">IPV6</th>
+                                <th class="text-center" style="width: 15%;">配置(核/内存/磁盘)</th>
+                                <th class="text-center" style="width: 15%;">创建时间</th>
+                            </tr>
+                        </thead>
+                        <tbody id="instanceList">
+                            <tr><td colspan="6" class="text-center text-muted py-5">请先连接一个账号并刷新列表</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer text-center py-3">
+                <div id="instanceActionGroup" class="action-group">
+                    <button type="button" id="startBtn" class="btn btn-success" disabled>启动</button>
+                    <button type="button" id="restartBtn" class="btn btn-success" disabled>重启</button>
+                    <button type="button" id="editInstanceBtn" class="btn btn-success" disabled>修改实例</button>
+                    <button type="button" id="changeIpBtn" class="btn btn-success" disabled>更换IP(V4)</button>
+                    <button type="button" id="addIpBtn" class="btn btn-success" disabled>附加IP(V4)</button>
+                    <button type="button" id="assignIpv6Btn" class="btn btn-success" disabled>附加IP(V6)</button>
+                    <button type="button" id="stopBtn" class="btn btn-danger" disabled>关机</button>
+                    <button type="button" id="terminateBtn" class="btn btn-danger" disabled>终止</button>
+                </div>
+            </div>
+        </section>
+
+        <section class="card oci-section-card">
+            <div class="card-header d-flex justify-content-between align-items-center gap-3 flex-wrap">
+                <div class="oci-card-title"><i class="bi bi-terminal-split"></i><span>日志输出</span></div>
+                <button id="clearLogBtn" class="btn btn-sm btn-outline-secondary">清除日志</button>
+            </div>
+            <div class="card-body p-2">
+                <div id="logOutput" class="form-control oci-log" style="height: 220px; overflow-y: auto;"></div>
+            </div>
+        </section>
+    </div>
+</div>
+
+<div class="modal fade" id="profilesHubModal" tabindex="-1" aria-labelledby="profilesHubModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content" style="max-height: 90vh;">
+            <div class="modal-header align-items-center">
+                <div class="flex-grow-1">
+                    <h5 class="modal-title" id="profilesHubModalLabel">OCI Profiles</h5>
+                    <div class="oci-modal-lead">在此管理您的账号配置。点击账号名称可进行连接、编辑与设置代理。</div>
+                </div>
+                
+                <div class="d-flex align-items-center gap-3 pe-3">
+                    <span class="badge bg-primary d-none" id="profilesModalCurrentStatus"></span>
+                    
+                    <button id="showAddAccountModalBtn" class="btn btn-sm rounded-pill text-white px-3 py-2 fw-bold" 
+                            style="background: linear-gradient(135deg, #0ea5e9, #3b82f6); border: none; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25); transition: transform 0.2s ease, box-shadow 0.2s ease;" 
+                            data-bs-toggle="modal" data-bs-target="#addAccountModal" 
+                            onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 6px 16px rgba(59, 130, 246, 0.35)';" 
+                            onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(59, 130, 246, 0.25)';">
+                        <i class="bi bi-person-plus-fill me-1"></i> 添加新账户
+                    </button>
+
+                    <button id="batchDeleteProfilesBtn" class="btn btn-sm rounded-pill text-white px-3 py-2 fw-bold" disabled
+                            style="background: linear-gradient(135deg, #ef4444, #dc2626); border: none; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25); transition: transform 0.2s ease, box-shadow 0.2s ease;" 
+                            onmouseover="if(!this.disabled){this.style.transform='translateY(-1px)'; this.style.boxShadow='0 6px 16px rgba(239, 68, 68, 0.35)';}" 
+                            onmouseout="if(!this.disabled){this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(239, 68, 68, 0.25)';}">
+                        <i class="bi bi-trash-fill me-1"></i> 删除选中
+                    </button>
+                </div>
+                
+                <button type="button" class="btn-close m-0 ms-2" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px;" class="text-center">
+                                    <input type="checkbox" class="form-check-input" id="selectAllProfiles" style="cursor: pointer;">
+                                </th>
+                                <th style="width: 40px;"></th>
+                                <th id="sortAccountByAlias" style="padding-left: 10px; width: 25%; cursor: pointer;" title="点击按名称拼音排序">
+                                    账户(单击管理) <i id="sortAliasIcon" class="bi bi-arrow-down-up text-muted small"></i>
+                                </th>
+                                <th class="text-center" style="width: 15%;">租户名 / 租户 ID</th>
+                                <th class="text-center" style="width: 35%;">账号 / User</th>
+                                <th class="text-center" id="sortAccountByDate" style="cursor: pointer; width: 15%;" title="点击按时间临时排序">
+                                    租户创建时间 <i id="sortIcon" class="bi bi-arrow-down-up text-muted small"></i>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="profileList"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="profileManageModal" tabindex="-1" aria-labelledby="profileManageModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="profileManageModalTitle">账户管理</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <button id="modalConnectBtn" class="btn btn-success w-100 mb-4 py-3 fw-bold" style="font-size: 1.1rem; border-radius: 12px; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.2);">
+                    <i class="bi bi-link"></i> 立即连接此账户
+                </button>
+                <hr class="mb-4" style="border-color: rgba(148, 163, 184, 0.2);">
+                <form id="profileManageForm">
+                    <input type="hidden" id="manageOriginalAlias">
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label text-info fw-bold"><i class="bi bi-person"></i> 账号名称</label>
+                            <input type="text" class="form-control" id="manageProfileAlias">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-info fw-bold"><i class="bi bi-file-code"></i> 配置信息</label>
+                        <textarea class="form-control" id="manageProfileConfigText" rows="4"></textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label text-info fw-bold"><i class="bi bi-key"></i> 默认SSH公钥</label>
+                            <textarea class="form-control" id="manageProfileSshKey" rows="2"></textarea>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-info fw-bold"><i class="bi bi-file-lock"></i> 更新 PEM 私钥文件 (可选)</label>
+                        <input class="form-control" type="file" id="manageProfileKeyFile" accept=".pem">
+                    </div>
+                    
+                    <div class="p-3 mt-4 rounded border border-warning" style="background: rgba(245, 158, 11, 0.05);">
+                        <label class="form-label text-warning fw-bold"><i class="bi bi-shield-lock"></i> 代理设置 (Proxy)</label>
+                        <input type="text" class="form-control" id="manageProxyUrl" placeholder="留空则直连。例: http://user:pass@host:port">
+                        <div class="form-text text-muted mt-1">支持 http, https, socks5 协议。设置后针对该账号的所有请求将通过代理转发。</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary px-4" id="saveProfileManageBtn">保存更改</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="networkConfigHubModal" tabindex="-1" aria-labelledby="networkConfigHubModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title" id="networkConfigHubModalLabel">网络与配置</h5>
+                    <div class="oci-modal-lead">统一进入网络安全规则、Cloudflare 与 TG / API 配置。</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-grid gap-3">
+                    <button type="button" id="networkSettingsHubBtn" class="btn btn-outline-info text-start py-3 oci-hub-button">
+                        <i class="bi bi-diagram-3 me-2"></i>网络安全规则管理
+                    </button>
+                    <button type="button" id="cloudflareSettingsBtn" class="btn btn-outline-info text-start py-3 oci-hub-button">
+                        <i class="bi bi-cloud-fill me-2"></i>Cloudflare 设置
+                    </button>
+                    <button type="button" id="tgSettingsBtn" class="btn btn-outline-info text-start py-3 oci-hub-button">
+                        <i class="bi bi-telegram me-2"></i>TG & API 设置
+                    <button type="button" id="globalSshKeyHubBtn" class="btn btn-outline-info text-start py-3 oci-hub-button">
+                        <i class="bi bi-key-fill me-2"></i>默认 SSH 公钥设置
+                    </button>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="addAccountModal" tabindex="-1" aria-labelledby="addAccountModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addAccountModalLabel">添加 OCI 账户</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="newProfileAlias" class="form-label">账号名称 (自定义)</label>
+                    <input type="text" class="form-control" id="newProfileAlias" placeholder="例如: oracle-sg-account1">
+                </div>
+                <div class="mb-3">
+                    <label for="newProfileConfigText" class="form-label">配置信息</label>
+                    <textarea class="form-control" id="newProfileConfigText" rows="4" placeholder="user=&#10;fingerprint=&#10;tenancy=&#10;region="></textarea>
+                </div>
+                <div class="mb-3">
+                    <label for="newProfileKeyFile" class="form-label">上传 PEM 私钥文件</label>
+                    <input class="form-control" type="file" id="newProfileKeyFile" accept=".pem">
+                </div>
+                <div class="mb-3">
+                    <label for="accountSshKeyFile" class="form-label">上传SSH公钥文件 (.pub)</label>
+                    <input class="form-control" type="file" id="accountSshKeyFile" accept=".pub">
+                    <small class="text-muted d-block mt-1">提示：如果公钥留空，将自动使用已保存的全局默认公钥。</small>
+                </div>
+                
+                <div class="p-3 mt-4 oci-soft-panel">
+                    <h6 class="mb-2">全局默认SSH公钥状态</h6>
+                    <div id="defaultSshKeyStatusText" class="form-text mb-2" style="height: 1.2rem;"></div>
+                    <div class="form-text text-muted"><i class="bi bi-info-circle"></i> 如需修改全局公钥，请在主界面的【网络与配置】菜单中进行设置。</div>
+                </div>
+                </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                <button type="button" class="btn btn-primary" id="addNewProfileBtnModal">确认添加</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="createLaunchInstanceModal" tabindex="-1" aria-labelledby="createLaunchInstanceModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createLaunchInstanceModalLabel">创建 / 抢占新实例</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small">创建将以**抢占模式**执行（资源不足时自动重试）。</p>
+                <form id="createLaunchInstanceForm">
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label for="instanceNamePrefix" class="form-label">实例名称 / 前缀</label>
+                            <input type="text" class="form-control" id="instanceNamePrefix" value="instance" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="instanceCount" class="form-label">创建数量</label>
+                            <input type="number" class="form-control" id="instanceCount" value="1" min="1" max="10" required>
+                        </div>
+                    </div>
+                    
+                    <div class="card mb-3">
+                        <div class="card-header py-2">
+                            <h6 class="mb-0 small fw-bold">登录认证设置</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">SSH 公钥配置</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="sshKeySource" id="sshKeySourceDefault" value="default" checked>
+                                    <label class="form-check-label" for="sshKeySourceDefault">
+                                        使用账号默认公钥 (推荐)
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="sshKeySource" id="sshKeySourceCustom" value="custom">
+                                    <label class="form-check-label" for="sshKeySourceCustom">
+                                        手动输入/上传本次专用的公钥
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="mb-3 d-none" id="customSshKeyContainer">
+                                <textarea class="form-control" id="launchCustomSshKey" rows="3" placeholder="在此粘贴 ssh-rsa 开头的公钥..."></textarea>
+                            </div>
+
+                            <hr class="my-2">
+
+                            <div class="mt-2">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="enablePasswordLoginCheck">
+                                    <label class="form-check-label" for="enablePasswordLoginCheck">同时启用密码登录 (可选)</label>
+                                </div>
+                            </div>
+                            <div class="row d-none mt-2" id="passwordInputContainer">
+                                <div class="col-12">
+                                    <input type="password" class="form-control" id="instancePassword" placeholder="在此输入自定义密码 (留空则使用随机密码)">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label for="instanceOS" class="form-label">操作系统</label>
+                            <select class="form-select" id="instanceOS" required>
+                                <option value="Canonical Ubuntu-22.04" selected>Canonical Ubuntu 22.04</option>
+                                <option value="Canonical Ubuntu-20.04">Canonical Ubuntu 20.04</option>
+                                <option value="Oracle Linux-9">Oracle Linux 9</option>
+                                <option value="Oracle Linux-8">Oracle Linux 8</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                           <label for="bootVolumeSize" class="form-label">磁盘大小 (GB)</label>
+                           <input type="number" class="form-control" id="bootVolumeSize" value="50" min="50">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="instanceShape" class="form-label">实例规格 (Shape)</label>
+                        <select class="form-select" id="instanceShape" required>
+                            <option value="VM.Standard.A1.Flex" selected>VM.Standard.A1.Flex (ARM - 最高4核24G免费)</option>
+                            <option value="VM.Standard.E2.1.Micro">VM.Standard.E2.1.Micro (AMD - 1核1G免费)</option>
+                        </select>
+                    </div>
+
+                    <div id="flexShapeConfig" class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="instanceOcpus" class="form-label">OCPU 数量</label>
+                            <input type="number" class="form-control" id="instanceOcpus" value="4" min="1" max="4">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="instanceMemory" class="form-label">内存 (GB)</label>
+                            <input type="number" class="form-control" id="instanceMemory" value="24" min="1" max="24">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">默认开机脚本</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-terminal"></i></span>
+                            <input type="text" class="form-control" id="defaultStartupScriptInput" readonly>
+                            <button class="btn btn-outline-secondary" type="button" id="editDefaultScriptBtn" title="点击编辑默认脚本">
+                                <i class="bi bi-pencil-square"></i> 编辑
+                            </button>
+                        </div>
+                        <div class="form-text text-muted" style="font-size: 0.8rem;">
+                            该脚本将始终首先执行。点击“编辑”可修改并自动保存。
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="startupScript" class="form-label">开机脚本 (可选)</label>
+                        <textarea class="form-control" id="startupScript" rows="4" spellcheck="false" 
+                                  placeholder="在此粘贴您的脚本（例如监控探针等）。&#10;它将在默认脚本之后执行。"></textarea>
+                    </div>
+                    
+                    <div id="snatchModeOptions">
+                        <hr>
+                        <h6>抢占模式与域名设置</h6>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="minDelay" class="form-label">最短重试间隔 (秒)</label>
+                                <input type="number" class="form-control" id="minDelay" value="30">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="maxDelay" class="form-label">最长重试间隔 (秒)</label>
+                                <input type="number" class="form-control" id="maxDelay" value="90">
+                            </div>
+                        </div>
+                         <div class="form-text">可用性域将由程序自动轮询，无需手动指定。</div>
+                        
+                        <div class="form-check mt-3">
+                            <input class="form-check-input" type="checkbox" value="" id="autoBindDomainCheck">
+                            <label class="form-check-label" for="autoBindDomainCheck">
+                                自动绑定 Cloudflare 域名
+                            </label>
+                            <div class="form-text">勾选后，将使用实例名作为子域名自动解析到公网IP。请先在“Cloudflare设置”中完成配置。</div>
+                        </div>
+
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                <button type="button" class="btn btn-primary" id="submitLaunchInstanceBtn">确认</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="viewSnatchTasksModal" tabindex="-1" aria-labelledby="viewSnatchTasksModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content" style="max-height: 90vh;">
+            <div class="modal-header">
+                <div><h5 class="modal-title" id="viewSnatchTasksModalLabel">抢占任务管理</h5><div class="oci-modal-lead">查看实时任务、日志输出，并执行暂停、恢复与删除操作。</div></div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" style="overflow-y: auto;">
+                <ul class="nav nav-tabs" id="snatchTaskTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="running-tab" data-bs-toggle="tab" data-bs-target="#running-tab-pane" type="button" role="tab">正在运行</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="completed-tab" data-bs-toggle="tab" data-bs-target="#completed-tab-pane" type="button" role="tab">已完成</button>
+                    </li>
+                </ul>
+                <div class="tab-content" id="snatchTaskTabsContent">
+                    <div class="tab-pane fade show active" id="running-tab-pane" role="tabpanel">
+                        <div class="p-3">
+                            <p class="text-muted small">
+                                <input class="form-check-input me-1" type="checkbox" id="selectAllRunningTasks" title="全选/全不选">
+                                下方列出了正在运行和已暂停的任务。选中后可暂停、恢复或删除已暂停的任务。
+                            </p>
+                            <ul class="list-group" id="runningSnatchTasksList"></ul>
+                        </div>
+                    </div>
+                    <div class="tab-pane fade" id="completed-tab-pane" role="tabpanel">
+                         <div class="p-3">
+                            <p class="text-muted small">
+                                <input class="form-check-input me-1" type="checkbox" id="selectAllCompletedTasks" title="全选/全不选">
+                                下方列出了最近已完成（成功或失败）的抢占任务。双击成功的任务可查看密码，选中记录后可删除。
+                            </p>
+                            <ul class="list-group" id="completedSnatchTasksList"></ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="snatchLogArea" class="mt-2">
+                    <div class="w-100 my-4" style="height: 2px; background: linear-gradient(90deg, rgba(128,128,128,0.05) 0%, rgba(128,128,128,0.4) 50%, rgba(128,128,128,0.05) 100%); border-radius: 1px;"></div>
+                    
+                    <div class="d-flex justify-content-between align-items-center mb-2 px-1">
+                        <h6 class="mb-0 text-secondary fw-bold"><i class="bi bi-terminal-fill"></i> 实时任务日志</h6>
+                        <button id="clearSnatchLogBtn" class="btn btn-sm btn-outline-secondary">清除日志</button>
+                    </div>
+                    <div id="snatchLogOutput" class="form-control" style="height: 250px; overflow-y: auto; background-color: var(--bs-dark-bg-subtle, #f8f9fa); font-family: monospace; font-size: 0.85rem; border: 1px solid rgba(128, 128, 128, 0.2); box-shadow: inset 0 2px 5px rgba(0,0,0,0.08);">
+                    </div>
+                </div>
+                </div>
+            <div class="modal-footer d-flex justify-content-between align-items-center">
+                <div id="running-actions" class="d-flex gap-2">
+                    <button type="button" class="btn btn-success" id="resumeSnatchTaskBtn" disabled>
+                        <i class="bi bi-play-circle"></i> 恢复选中
+                    </button>
+                    <button type="button" class="btn btn-warning" id="stopSnatchTaskBtn" disabled>
+                        <i class="bi bi-pause-circle"></i> 暂停选中
+                    </button>
+                </div>
+                
+                <div class="ms-auto d-flex align-items-center gap-2">
+                    <div id="completed-actions" style="display: none;">
+                        <button type="button" class="btn btn-danger" id="deleteCompletedBtn" disabled>
+                            <i class="bi bi-trash"></i> 删除记录
+                        </button>
+                    </div>
+                    <div id="running-delete-action">
+                        <button type="button" class="btn btn-danger" id="deleteSnatchTaskBtn" disabled>
+                            <i class="bi bi-trash"></i> 删除任务
+                        </button>
+                    </div>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editInstanceModal" tabindex="-1" aria-labelledby="editInstanceModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editInstanceModalLabel">修改实例配置</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="editDisplayName" class="form-label">实例显示名称</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="editDisplayName">
+                        <button class="btn btn-outline-primary" type="button" id="saveDisplayNameBtn">保存名称</button>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label class="form-label mb-0 fw-bold">网络 IP 管理 (IPv4)</label>
+                        <button class="btn btn-sm btn-outline-danger px-2" id="batchDeleteIpBtn" style="font-size: 0.75rem;">
+                            <i class="bi bi-trash"></i> 批量删除
+                        </button>
+                    </div>
+                    <div class="table-responsive border rounded oci-soft-panel" style="max-height: 200px; overflow-y: auto;">
+                        <table class="table table-sm table-hover mb-0 align-middle w-100">
+                            <thead class="sticky-top" style="z-index: 1;">
+                                <tr>
+                                    <th class="text-center" style="width: 40px;">
+                                        <input type="checkbox" id="selectAllIpv4" class="form-check-input" style="cursor: pointer;">
+                                    </th>
+                                    <th>内网 IP</th>
+                                    <th>公网 IP</th>
+                                    <th class="text-center" style="width: 80px;">类型</th>
+                                    <th class="text-center" style="width: 60px;">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="editInstanceIpList">
+                                <tr><td colspan="5" class="text-center text-muted small py-3">正在加载 IPv4 信息...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="form-text mt-1"><i class="bi bi-info-circle"></i> 提示: 主 IP 无法删除。删除辅助 IP 将立即生效。</div>
+                </div>
+
+                <div class="mb-3 mt-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label class="form-label mb-0 fw-bold">网络 IP 管理 (IPv6)</label>
+                        <button class="btn btn-sm btn-outline-danger px-2" id="batchDeleteIpv6Btn" style="font-size: 0.75rem;">
+                            <i class="bi bi-trash"></i> 批量删除
+                        </button>
+                    </div>
+                    <div class="table-responsive border rounded oci-soft-panel" style="max-height: 150px; overflow-y: auto;">
+                        <table class="table table-sm table-hover mb-0 align-middle w-100">
+                            <thead class="sticky-top" style="z-index: 1;">
+                                <tr>
+                                    <th class="text-center" style="width: 40px;">
+                                        <input type="checkbox" id="selectAllIpv6" class="form-check-input" style="cursor: pointer;">
+                                    </th>
+                                    <th>IPv6 地址</th>
+                                    <th class="text-center" style="width: 60px;">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="editInstanceIpv6List">
+                                <tr><td colspan="3" class="text-center text-muted small py-3">正在加载 IPv6 信息...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="form-text mt-1"><i class="bi bi-info-circle"></i> 提示: 删除 IPv6 地址将立即生效。</div>
+                </div>
+                
+                <hr>
+                
+                <div id="editFlexInstanceConfig" class="d-none">
+                    <label class="form-label">CPU与内存 (仅限ARM机型)</label>
+                    <div class="row">
+                        <div class="col-md-5">
+                               <div class="input-group">
+                                    <span class="input-group-text">OCPU</span>
+                                    <input type="number" class="form-control" id="editOcpus" min="1" max="4">
+                                </div>
+                        </div>
+                        <div class="col-md-5">
+                            <div class="input-group">
+                                    <span class="input-group-text">内存(GB)</span>
+                                    <input type="number" class="form-control" id="editMemory" min="1" max="24">
+                            </div>
+                        </div>
+                        <div class="col-md-2 d-grid">
+                            <button class="btn btn-outline-primary" id="saveFlexConfigBtn">保存</button>
+                        </div>
+                    </div>
+                    <small class="form-text text-muted">修改此配置需要先停止实例。</small>
+                    <hr>
+                </div>
+                <div class="row align-items-end">
+                    <div class="col-md-6">
+                        <label for="editBootVolumeSize" class="form-label">引导卷大小 (GB)</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" id="editBootVolumeSize" min="50">
+                            <button class="btn btn-outline-primary" id="saveBootVolumeSizeBtn">保存大小</button>
+                        </div>
+                    </div>
+                     <div class="col-md-6">
+                        <label for="editVpus" class="form-label">引导卷性能 (VPU)</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" id="editVpus" min="10" max="120" step="10">
+                            <button class="btn btn-outline-primary" id="saveVpusBtn">保存性能</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="networkSettingsModal" tabindex="-1" aria-labelledby="networkSettingsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="networkSettingsModalLabel">网络安全规则管理</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                
+                <div class="alert alert-info d-flex align-items-center">
+                    <i class="bi bi-info-circle flex-shrink-0 me-2"></i>
+                    <div class="d-flex align-items-center w-100">
+                        <span class="me-2" style="white-space: nowrap;">VCN:</span>
+                        <select id="vcnSelect" class="form-select form-select-sm me-3" style="width: auto; min-width: 200px;"></select>
+                        <span class="me-2" style="white-space: nowrap;">安全列表:</span>
+                        <select id="securityListSelect" class="form-select form-select-sm" style="width: auto; min-width: 200px;"></select>
+                        <div id="networkRulesSpinner" class="spinner-border spinner-border-sm ms-3 d-none" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+                <ul class="nav nav-tabs" id="pills-tab" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="pills-ingress-tab" data-bs-toggle="pill" data-bs-target="#pills-ingress" type="button" role="tab">入站规则</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="pills-egress-tab" data-bs-toggle="pill" data-bs-target="#pills-egress" type="button" role="tab">出站规则</button>
+                    </li>
+                </ul>
+                <div class="tab-content" id="pills-tabContent">
+                    <div class="tab-pane fade show active" id="pills-ingress" role="tabpanel">
+                        <div class="table-responsive pt-3">
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>状态</th><th>源地址</th><th>协议</th><th>目标端口</th><th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ingressRulesTable">
+                                </tbody>
+                            </table>
+                            <button class="btn btn-sm btn-outline-primary" id="addIngressRuleBtn"><i class="bi bi-plus"></i> 添加入站规则</button>
+                        </div>
+                    </div>
+                    <div class="tab-pane fade" id="pills-egress" role="tabpanel">
+                        <div class="table-responsive pt-3">
+                             <table class="table table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>状态</th><th>目标地址</th><th>协议</th><th>目标端口</th><th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="egressRulesTable">
+                                </tbody>
+                            </table>
+                            <button class="btn btn-sm btn-outline-primary" id="addEgressRuleBtn"><i class="bi bi-plus"></i> 添加出站规则</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-warning me-auto" id="openFirewallBtn">
+                    <i class="bi bi-shield-fill-exclamation"></i> 一键开放防火墙 (All)
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                <button type="button" class="btn btn-primary" id="saveNetworkRulesBtn">
+                    <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                    保存更改
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="taskResultModal" tabindex="-1" aria-labelledby="taskResultModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="taskResultModalLabel">任务结果详情</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="taskResultModalBody" style="white-space: pre-wrap; word-break: break-all; padding: 1rem; border-radius: 0.25rem;">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="confirmActionModal" tabindex="-1" aria-labelledby="confirmActionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmActionModalLabel">请确认操作</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p id="confirmActionModalBody"></p>
+                <div id="confirmActionModalTerminateOptions" class="mt-3 d-none">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" value="" id="confirmDeleteVolumeCheck">
+                        <label class="form-check-label" for="confirmDeleteVolumeCheck">
+                            同时删除引导卷 (此操作无法恢复)
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-danger" id="confirmActionModalConfirmBtn">确认</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="tgSettingsModal" tabindex="-1" aria-labelledby="tgSettingsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div><h5 class="modal-title" id="tgSettingsModalLabel">Telegram & API 设置</h5><div class="oci-modal-lead">配置通知推送、API Key 与扩展管理接入能力。</div></div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h6><i class="bi bi-telegram"></i> Telegram 推送设置 (全局)</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="tgBotToken" class="form-label">Bot Token</label>
+                                <input type="password" class="form-control" id="tgBotToken" placeholder="输入您的 Bot Token">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="tgChatId" class="form-label">Chat ID</label>
+                                <input type="text" class="form-control" id="tgChatId" placeholder="输入您的 User/Chat ID">
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted" style="font-size: 0.75rem;">
+                                如何获取? 1. 与 <a href="https://t.me/BotFather" target="_blank">@BotFather</a> 对话创建机器人获取 Token. 2. 与 <a href="https://t.me/userinfobot" target="_blank">@userinfobot</a> 对话获取 Chat ID.
+                            </small>
+                            <button type="button" class="btn btn-info btn-sm" id="saveTgConfigBtn">
+                                <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                                保存推送设置
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h6><i class="bi bi-diagram-2-fill"></i> X-UI Manager 对接配置</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="xuiManagerUrl" class="form-label">管理面板地址     （项目地址：https://github.com/SIJULY/xui_manager）</label>
+                            <input type="text" class="form-control" id="xuiManagerUrl" placeholder="例如: http://1.2.3.4:8080">
+                            <div class="form-text">X-UI Manager 面板的访问地址 </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="xuiManagerSecret" class="form-label">通讯密钥 (Secret Key)</label>
+                            <input type="password" class="form-control" id="xuiManagerSecret" placeholder="输入 X-UI Manager Pro管理面板首页获取的 XUI_SECRET_KEY">
+                        </div>
+                        <div class="d-flex justify-content-end">
+                            <button type="button" class="btn btn-primary btn-sm" id="saveXuiConfigBtn">
+                                <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                                保存对接配置
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h6><i class="bi bi-key-fill"></i> TG Bot 助手 API 密钥     （项目地址：https://github.com/SIJULY/tgbot）   </h6>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small">这是您的 TG Bot 控制面板所需的 API 密钥。请妥善保管，不要泄露。程序首次启动时会自动生成。</p>
+                        <div class="input-group">
+                            <input type="text" id="apiKeyInput" class="form-control" placeholder="点击右侧按钮获取密钥" readonly>
+                            <div class="input-group-append">
+                                <button class="btn btn-outline-primary" type="button" id="getApiKeyBtn">获取/复制密钥</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="cloudflareSettingsModal" tabindex="-1" aria-labelledby="cloudflareSettingsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div><h5 class="modal-title" id="cloudflareSettingsModalLabel">Cloudflare DNS 设置</h5><div class="oci-modal-lead">为实例公网 IP 自动绑定解析记录，统一管理 DNS 能力。</div></div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">请确保提供的 API 令牌具有该 Zone 的 "DNS:Edit" 权限。</div>
+                <div class="mb-3">
+                    <label for="cloudflareApiToken" class="form-label">Cloudflare API 令牌</label>
+                    <input type="password" class="form-control" id="cloudflareApiToken" placeholder="输入您的 Cloudflare API Token">
+                </div>
+                <div class="mb-3">
+                    <label for="cloudflareZoneId" class="form-label">Zone ID</label>
+                    <input type="text" class="form-control" id="cloudflareZoneId" placeholder="输入您的域名 Zone ID">
+                </div>
+                <div class="mb-3">
+                    <label for="cloudflareDomain" class="form-label">主域名</label>
+                    <input type="text" class="form-control" id="cloudflareDomain" placeholder="例如: example.com">
+                </div>
+                 <small class="text-muted d-block mt-2">
+                    如何获取? 登录 Cloudflare -> 选择域名 -> 在右侧 "API" 部分找到您的 Zone ID。API 令牌请在 "My Profile" -> "API Tokens" 页面创建。
+                 </small>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                <button type="button" class="btn btn-primary" id="saveCloudflareConfigBtn">
+                    <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                    保存设置
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="globalSshKeyModal" tabindex="-1" aria-labelledby="globalSshKeyModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title" id="globalSshKeyModalLabel">默认 SSH 公钥设置</h5>
+                    <div class="oci-modal-lead">配置后，新创建的账户如果没有上传专用的公钥，将默认使用此公钥。</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="globalSshKeyInput" class="form-label fw-bold">1. 手动输入公钥</label>
+                    <textarea class="form-control oci-log" id="globalSshKeyInput" rows="6" placeholder="在此手动粘贴以 ssh-rsa / ecdsa-sha2-nistp256 / ssh-ed25519 等开头的公钥内容..."></textarea>
+                </div>
+                <div class="mb-3">
+                    <label for="globalSshKeyFileInput" class="form-label fw-bold">2. 或从本地文件读取</label>
+                    <input class="form-control" type="file" id="globalSshKeyFileInput" accept=".pub">
+                    <div class="form-text text-info mt-1"><i class="bi bi-magic"></i> 选择 .pub 文件后，系统会自动读取内容并填充到上方的输入框中。</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary px-4" id="submitGlobalSshKeyBtn">
+                    <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                    保存公钥
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<div class="modal fade" id="userManagementModal" tabindex="-1" aria-labelledby="userManagementModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title fw-bold" id="userManagementModalLabel"><i class="bi bi-shield-lock-fill text-warning"></i> 身份与用户安全管理</h5>
+                    <div class="oci-modal-lead">管理租户下的 IAM 用户。支持重置密码、修改绑定邮箱、强制清除 2FA (双重验证)。</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="p-3 border-bottom border-secondary d-flex justify-content-between align-items-center" style="background: rgba(2, 6, 23, 0.3);">
+                    <button id="refreshUsersBtn" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-clockwise"></i> 刷新列表</button>
+                    <button id="showCreateUserBtn" class="btn btn-sm btn-primary"><i class="bi bi-person-plus-fill"></i> 创建新用户</button>
+                </div>
+                
+                <div id="createUserFormArea" class="p-3 border-bottom border-secondary d-none" style="background: rgba(2, 6, 23, 0.5);">
+                    <h6 class="fw-bold mb-3 text-info">创建新 IAM 用户</h6>
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label small text-light">用户名 (必填)</label>
+                            <input type="text" id="newUserName" class="form-control form-control-sm oci-log" placeholder="例如: admin2">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small text-light">绑定邮箱 (可选)</label>
+                            <input type="email" id="newUserEmail" class="form-control form-control-sm oci-log" placeholder="例如: user@domain.com">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small text-light">备注描述</label>
+                            <input type="text" id="newUserDesc" class="form-control form-control-sm oci-log" value="Created via Web Panel">
+                        </div>
+                        <div class="col-md-2">
+                            <button id="submitCreateUserBtn" class="btn btn-success btn-sm w-100">确认创建</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-responsive" style="max-height: 50vh; overflow-y: auto;">
+                    <table class="table table-hover table-dark align-middle mb-0">
+                        <thead class="sticky-top" style="background: rgba(15, 23, 42, 0.95); z-index: 1;">
+                            <tr>
+                                <th style="width: 25%; padding-left: 1rem;">用户名</th>
+                                <th style="width: 25%;">绑定邮箱</th>
+                                <th style="width: 15%; text-align: center;">状态</th>
+                                <th style="width: 35%; text-align: center;">高危安全操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="iamUsersList">
+                            <tr><td colspan="4" class="text-center text-muted py-5">正在拉取租户用户数据...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <div class="alert alert-warning py-1 px-2 m-0 small me-auto border-warning" style="background: rgba(255, 193, 7, 0.1);"><i class="bi bi-exclamation-triangle-fill"></i> 警告: 重置密码将生成一次性密码，若未记录将无法登录！</div>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/oci_script.js', v='2026040517') }}"></script>
+<script>
+window.addEventListener('load', () => {
+    const profileList = document.getElementById('profileList');
+    const currentProfileStatus = document.getElementById('currentProfileStatus');
+    const actionAreaProfile = document.getElementById('actionAreaProfile');
+    const connectedProfileEmptyState = document.getElementById('connectedProfileEmptyState');
+    const connectedProfileDetails = document.getElementById('connectedProfileDetails');
+    const connectedProfileAlias = document.getElementById('connectedProfileAlias');
+    const connectedProfileUser = document.getElementById('connectedProfileUser');
+    const connectedProfileRegion = document.getElementById('connectedProfileRegion');
+    const connectedProfileProxy = document.getElementById('connectedProfileProxy');
+    const connectedProfileTenancy = document.getElementById('connectedProfileTenancy');
+    const connectedProfileRegDate = document.getElementById('connectedProfileRegDate');
+    const connectedProfileSsh = document.getElementById('connectedProfileSsh');
+    const connectedProfileFingerprint = document.getElementById('connectedProfileFingerprint');
+    const connectedProfileMeta = document.getElementById('connectedProfileMeta');
+    const connectedProfileStatusBadge = document.getElementById('connectedProfileStatusBadge');
+    const instanceList = document.getElementById('instanceList');
+    const refreshInstancesBtn = document.getElementById('refreshInstancesBtn');
+    const createInstanceBtn = document.getElementById('createInstanceBtn');
+    const disconnectAccountBtn = document.getElementById('disconnectAccountBtn');
+    const networkSettingsHubBtn = document.getElementById('networkSettingsHubBtn');
+    const cloudflareSettingsBtn = document.getElementById('cloudflareSettingsBtn');
+    const tgSettingsBtn = document.getElementById('tgSettingsBtn');
+    const viewSnatchTasksBtn = document.getElementById('viewSnatchTasksBtn');
+    const runningSnatchTasksList = document.getElementById('runningSnatchTasksList');
+    const completedSnatchTasksList = document.getElementById('completedSnatchTasksList');
+    const tgBotTokenInput = document.getElementById('tgBotToken');
+    const tgChatIdInput = document.getElementById('tgChatId');
+    const cloudflareApiTokenInput = document.getElementById('cloudflareApiToken');
+    const cloudflareZoneIdInput = document.getElementById('cloudflareZoneId');
+    const cloudflareDomainInput = document.getElementById('cloudflareDomain');
+    const xuiManagerUrlInput = document.getElementById('xuiManagerUrl');
+    const xuiManagerSecretInput = document.getElementById('xuiManagerSecret');
+    if (!profileList) return;
+
+    const hasProfileRows = () => profileList.querySelector('tr[data-alias]');
+
+    const renderFallbackConnectedProfile = async (alias) => {
+        if (!alias) return;
+        try {
+            const response = await fetch(`/oci/api/profiles/${encodeURIComponent(alias)}`, { credentials: 'same-origin' });
+            if (!response.ok) return;
+            const profile = await response.json();
+
+            if (currentProfileStatus) currentProfileStatus.textContent = `已连接: ${alias}`;
+            if (actionAreaProfile) {
+                actionAreaProfile.textContent = `当前账号: ${alias}`;
+                actionAreaProfile.classList.remove('d-none');
+            }
+            if (disconnectAccountBtn) disconnectAccountBtn.disabled = false;
+            if (connectedProfileEmptyState) connectedProfileEmptyState.classList.add('d-none');
+            if (connectedProfileDetails) connectedProfileDetails.classList.remove('d-none');
+            if (connectedProfileAlias) {
+                connectedProfileAlias.textContent = alias;
+                connectedProfileAlias.title = alias;
+            }
+            if (connectedProfileUser) {
+                const userText = profile.user_display_name || profile.user || '未设置';
+                connectedProfileUser.textContent = userText;
+                connectedProfileUser.title = userText;
+            }
+            if (connectedProfileRegion) {
+                connectedProfileRegion.textContent = profile.region || '未设置';
+                connectedProfileRegion.title = profile.region || '未设置';
+            }
+            if (connectedProfileProxy) {
+                connectedProfileProxy.textContent = profile.proxy || '未设置';
+                connectedProfileProxy.title = profile.proxy || '未设置';
+            }
+            if (connectedProfileTenancy) {
+                const tenancyText = profile.tenancy_display_name || profile.tenancy_name || profile.tenancy || '未设置';
+                connectedProfileTenancy.textContent = tenancyText;
+                connectedProfileTenancy.title = tenancyText;
+            }
+            if (connectedProfileRegDate) {
+                connectedProfileRegDate.textContent = profile.registration_date || '待同步';
+                connectedProfileRegDate.title = profile.registration_date || '待同步';
+            }
+            if (connectedProfileSsh) {
+                connectedProfileSsh.innerHTML = profile.default_ssh_public_key
+                    ? '<span class="badge bg-success-subtle text-success border border-success-subtle">已配置默认 SSH 公钥</span>'
+                    : '<span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">未配置默认 SSH 公钥</span>';
+            }
+            if (connectedProfileFingerprint) {
+                connectedProfileFingerprint.textContent = profile.fingerprint || '未设置';
+                connectedProfileFingerprint.title = profile.fingerprint || '未设置';
+            }
+            if (connectedProfileMeta) {
+                connectedProfileMeta.textContent = `租户ID: ${profile.tenancy || 'N/A'} | 区域: ${profile.region || 'N/A'} | 用户: ${profile.user || 'N/A'}`;
+                connectedProfileMeta.title = connectedProfileMeta.textContent;
+            }
+            if (connectedProfileStatusBadge) {
+                connectedProfileStatusBadge.innerHTML = '<span class="badge bg-success-subtle text-success border border-success-subtle">已连接</span>';
+            }
+        } catch (error) {
+            console.warn('OCI fallback connected profile failed:', error);
+        }
+    };
+
+    const renderFallbackInstances = async () => {
+        if (!instanceList) return;
+        try {
+            if (refreshInstancesBtn) refreshInstancesBtn.disabled = false;
+            instanceList.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-5"><div class="spinner-border spinner-border-sm"></div> 正在加载...</td></tr>`;
+            const response = await fetch('/oci/api/instances', { credentials: 'same-origin' });
+            if (!response.ok) throw new Error('load instances failed');
+            const instances = await response.json();
+            instanceList.innerHTML = '';
+            if (!Array.isArray(instances) || instances.length === 0) {
+                instanceList.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-5">未找到任何实例</td></tr>`;
+                return;
+            }
+            instances.forEach(inst => {
+                const tr = document.createElement('tr');
+                const state = inst.lifecycle_state;
+                const dotClass = state === 'RUNNING' ? 'status-running' : (state === 'STOPPED' ? 'status-stopped' : 'status-other');
+                tr.dataset.instanceId = inst.id;
+                tr.dataset.instanceData = JSON.stringify(inst);
+                tr.style.cursor = 'pointer';
+                tr.innerHTML = `
+                    <td class="align-middle" style="text-align: left; padding-left: 1rem;">${inst.display_name}</td>
+                    <td class="text-center align-middle"><div class="status-cell justify-content-center d-flex"><span class="status-dot ${dotClass} me-2"></span><span>${state}</span></div></td>
+                    <td class="text-center align-middle">${inst.public_ip || '无'}</td>
+                    <td class="text-center align-middle">${inst.ipv6_address || '无'}</td>
+                    <td class="text-center align-middle">${inst.ocpus}c / ${inst.memory_in_gbs}g / ${inst.boot_volume_size_gb}</td>
+                    <td class="text-center align-middle">${new Date(inst.time_created).toLocaleString()}</td>`;
+                instanceList.appendChild(tr);
+            });
+        } catch (error) {
+            instanceList.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-5">加载实例列表失败</td></tr>`;
+            console.warn('OCI fallback instances failed:', error);
+        }
+    };
+
+    const renderFallbackProfiles = async () => {
+        if (hasProfileRows()) return;
+
+        try {
+            const [profilesRes, sessionRes] = await Promise.all([
+                fetch('/oci/api/profiles', { credentials: 'same-origin' }),
+                fetch('/oci/api/session', { credentials: 'same-origin' }).catch(() => null)
+            ]);
+
+            if (!profilesRes.ok) return;
+            const profiles = await profilesRes.json();
+            const session = sessionRes && sessionRes.ok ? await sessionRes.json() : { logged_in: false };
+
+            profileList.innerHTML = '';
+            if (!Array.isArray(profiles) || profiles.length === 0) {
+                profileList.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-5"><div class="mb-2"><i class="bi bi-person-x fs-3"></i></div><div>未找到账号，请点击右上角添加</div></td></tr>`;
+                return;
+            }
+
+            profiles.forEach(p => {
+                const tr = document.createElement('tr');
+                tr.dataset.alias = p.alias;
+                tr.dataset.regDate = p.registration_date || '';
+                
+                let cachedTenancy = localStorage.getItem('oci_tenancy_' + p.alias);
+                if (!cachedTenancy || cachedTenancy.startsWith('ocid1.')) cachedTenancy = '-';
+                
+                let cachedUser = localStorage.getItem('oci_user_' + p.alias);
+                if (!cachedUser || cachedUser.startsWith('ocid1.')) cachedUser = '-';
+
+                let dateDisplay = `<span class="text-muted small">待同步 (连接后自动获取)</span>`;
+                if (p.registration_date && p.days_elapsed !== undefined) {
+                    dateDisplay = `<span class="text-success" style="font-weight:500;">${p.registration_date} (${p.days_elapsed}天)</span>`;
+                }
+
+                tr.innerHTML = `
+                    <td class="text-center align-middle">
+                        <input class="form-check-input profile-checkbox" type="checkbox" value="${p.alias}">
+                    </td>
+                    <td class="drag-handle text-center align-middle"><i class="bi bi-grip-vertical"></i></td>
+                    <td class="align-middle">
+                        <a href="#" class="btn btn-outline-info btn-sm manage-profile-btn" data-alias="${p.alias}" style="width: 100%; text-align: left; font-weight: bold; background: rgba(14, 165, 233, 0.1); border-color: rgba(14, 165, 233, 0.3); color: #bae6fd;">
+                            <i class="bi bi-gear-fill me-2 text-info"></i> ${p.alias}
+                        </a>
+                    </td>
+                    <td class="text-center align-middle"><div class="text-truncate mx-auto text-center" style="max-width: 120px; font-size: 0.85rem;" title="${cachedTenancy}" id="row-tenancy-${p.alias}">${cachedTenancy}</div></td>
+                    <td class="text-center align-middle"><div class="text-truncate mx-auto text-center" style="max-width: 280px; font-size: 0.85rem;" title="${cachedUser}" id="row-user-${p.alias}">${cachedUser}</div></td>
+                    <td class="text-center align-middle" style="white-space: nowrap;">${dateDisplay}</td>
+                `;
+
+                if (session.logged_in && session.alias === p.alias) {
+                    tr.classList.add('table-active', 'profile-disabled');
+                }
+                profileList.appendChild(tr);
+            });
+
+            if (session.logged_in && session.alias) {
+                if (createInstanceBtn) createInstanceBtn.disabled = !session.can_create;
+                if (disconnectAccountBtn) disconnectAccountBtn.disabled = false;
+                if (networkSettingsHubBtn) networkSettingsHubBtn.disabled = false;
+                await renderFallbackConnectedProfile(session.alias);
+                await renderFallbackInstances();
+            }
+        } catch (error) {
+            console.warn('OCI fallback profile bootstrap failed:', error);
+        }
+    };
+
+
+    const showModalById = (modalId) => {
+        const modalEl = document.getElementById(modalId);
+        if (!modalEl || !window.bootstrap?.Modal) return;
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    };
+
+    const hideModalById = (modalId) => {
+        const modalEl = document.getElementById(modalId);
+        if (!modalEl || !window.bootstrap?.Modal) return;
+        const instance = bootstrap.Modal.getInstance(modalEl) || bootstrap.Modal.getOrCreateInstance(modalEl);
+        instance.hide();
+    };
+
+    const renderNetworkRulesFallback = (type, rules) => {
+        const tableBody = document.getElementById(type === 'ingress' ? 'ingressRulesTable' : 'egressRulesTable');
+        if (!tableBody) return;
+        tableBody.innerHTML = !rules || rules.length === 0
+            ? `<tr><td colspan="5" class="text-center text-muted">没有规则</td></tr>`
+            : rules.map(rule => createNetworkRuleRowFallback(type, rule).outerHTML).join('');
+        tableBody.querySelectorAll('.remove-rule-btn').forEach(btn => btn.onclick = () => btn.closest('tr').remove());
+    };
+
+    const createNetworkRuleRowFallback = (type, rule = {}) => {
+        const tr = document.createElement('tr');
+        tr.className = 'rule-row';
+        const sourceOrDest = type === 'ingress' ? (rule.source || '0.0.0.0/0') : (rule.destination || '0.0.0.0/0');
+        const protocol = rule.protocol || '6';
+        const protocolOptions = { 'all': '所有', '1': 'ICMP', '6': 'TCP', '17': 'UDP' };
+        const portRange = (options) => ({ min: options?.min || '', max: options?.max || '' });
+        const destPorts = portRange(rule.tcp_options ? rule.tcp_options.destination_port_range : (rule.udp_options ? rule.udp_options.destination_port_range : null));
+        tr.innerHTML = `
+            <td><input class="form-check-input" type="checkbox" data-key="is_stateless" ${rule.is_stateless ? 'checked' : ''}></td>
+            <td><input type="text" class="form-control form-control-sm" data-key="${type === 'ingress' ? 'source' : 'destination'}" value="${sourceOrDest}"></td>
+            <td><select class="form-select form-select-sm" data-key="protocol">${Object.entries(protocolOptions).map(([k, v]) => `<option value="${k}" ${protocol == k ? 'selected' : ''}>${v}</option>`).join('')}</select></td>
+            <td><div class="input-group input-group-sm"><input type="number" class="form-control" placeholder="Min" data-key="dest_port_min" value="${destPorts.min}"><input type="number" class="form-control" placeholder="Max" data-key="dest_port_max" value="${destPorts.max}"></div></td>
+            <td><button class="btn btn-sm btn-danger remove-rule-btn"><i class="bi bi-trash"></i></button></td>`;
+        return tr;
+    };
+
+    const collectNetworkRulesFallback = (tableBody, type) => {
+        return Array.from(tableBody.querySelectorAll('.rule-row')).map(tr => {
+            const rule = {
+                is_stateless: tr.querySelector('[data-key="is_stateless"]').checked,
+                protocol: tr.querySelector('[data-key="protocol"]').value
+            };
+            rule[type === 'ingress' ? 'source' : 'destination'] = tr.querySelector(`[data-key="${type === 'ingress' ? 'source' : 'destination'}"]`).value;
+            rule[`${type === 'ingress' ? 'source' : 'destination'}_type`] = 'CIDR_BLOCK';
+            if (['6', '17'].includes(rule.protocol)) {
+                let destMin = parseInt(tr.querySelector('[data-key="dest_port_min"]').value, 10);
+                let destMax = parseInt(tr.querySelector('[data-key="dest_port_max"]').value, 10);
+                if (!isNaN(destMin) && isNaN(destMax)) destMax = destMin;
+                if (isNaN(destMin) && !isNaN(destMax)) destMin = destMax;
+                const options = {};
+                if (!isNaN(destMin) && !isNaN(destMax)) {
+                    options.destination_port_range = { min: destMin, max: destMax };
+                }
+                if (rule.protocol === '6') rule.tcp_options = options;
+                else rule.udp_options = options;
+            }
+            return rule;
+        });
+    };
+
+    let fallbackNetworkResources = [];
+
+    const loadSecurityListRulesFallback = async (securityListId) => {
+        const networkRulesSpinner = document.getElementById('networkRulesSpinner');
+        const saveNetworkRulesBtn = document.getElementById('saveNetworkRulesBtn');
+        if (!securityListId) {
+            renderNetworkRulesFallback('ingress', []);
+            renderNetworkRulesFallback('egress', []);
+            return;
+        }
+        networkRulesSpinner?.classList.remove('d-none');
+        if (saveNetworkRulesBtn) saveNetworkRulesBtn.disabled = true;
+        try {
+            const response = await fetch(`/oci/api/network/security-list/${securityListId}`, { credentials: 'same-origin' });
+            if (!response.ok) throw new Error('load security list failed');
+            const slDetails = await response.json();
+            renderNetworkRulesFallback('ingress', slDetails.ingress_security_rules || []);
+            renderNetworkRulesFallback('egress', slDetails.egress_security_rules || []);
+        } catch (error) {
+            console.warn('fallback security list rules failed:', error);
+            renderNetworkRulesFallback('ingress', []);
+            renderNetworkRulesFallback('egress', []);
+        } finally {
+            networkRulesSpinner?.classList.add('d-none');
+            if (saveNetworkRulesBtn) saveNetworkRulesBtn.disabled = false;
+        }
+    };
+
+    const loadNetworkResourcesFallback = async () => {
+        const vcnSelect = document.getElementById('vcnSelect');
+        const securityListSelect = document.getElementById('securityListSelect');
+        const networkRulesSpinner = document.getElementById('networkRulesSpinner');
+        if (!vcnSelect || !securityListSelect) return;
+        vcnSelect.innerHTML = '<option value="">正在加载 VCN...</option>';
+        securityListSelect.innerHTML = '<option value="">请先选择VCN</option>';
+        vcnSelect.disabled = true;
+        securityListSelect.disabled = true;
+        renderNetworkRulesFallback('ingress', []);
+        renderNetworkRulesFallback('egress', []);
+        networkRulesSpinner?.classList.remove('d-none');
+        try {
+            const response = await fetch('/oci/api/network/resources', { credentials: 'same-origin' });
+            if (!response.ok) throw new Error('load network resources failed');
+            fallbackNetworkResources = await response.json();
+            networkRulesSpinner?.classList.add('d-none');
+            if (!Array.isArray(fallbackNetworkResources) || fallbackNetworkResources.length === 0) {
+                vcnSelect.innerHTML = '<option value="">未找到VCN</option>';
+                return;
+            }
+            vcnSelect.innerHTML = '';
+            fallbackNetworkResources.forEach(vcn => vcnSelect.add(new Option(vcn.vcn_name, vcn.vcn_id)));
+            vcnSelect.disabled = false;
+            vcnSelect.dispatchEvent(new Event('change'));
+        } catch (error) {
+            console.warn('fallback network resources failed:', error);
+            networkRulesSpinner?.classList.add('d-none');
+            vcnSelect.innerHTML = '<option value="">加载失败</option>';
+        }
+    };
+
+    networkSettingsHubBtn?.addEventListener('click', async () => {
+        hideModalById('networkConfigHubModal');
+        await loadNetworkResourcesFallback();
+        window.setTimeout(() => showModalById('networkSettingsModal'), 200);
+    });
+
+    document.getElementById('vcnSelect')?.addEventListener('change', () => {
+        const vcnSelect = document.getElementById('vcnSelect');
+        const securityListSelect = document.getElementById('securityListSelect');
+        const selectedVcnId = vcnSelect?.value;
+        const vcnData = fallbackNetworkResources.find(v => v.vcn_id === selectedVcnId);
+        if (!securityListSelect) return;
+        securityListSelect.innerHTML = '';
+        if (vcnData && vcnData.security_lists && vcnData.security_lists.length > 0) {
+            vcnData.security_lists.forEach(sl => securityListSelect.add(new Option(sl.display_name, sl.id)));
+            securityListSelect.disabled = false;
+            securityListSelect.dispatchEvent(new Event('change'));
+        } else {
+            securityListSelect.innerHTML = '<option value="">无安全列表</option>';
+            securityListSelect.disabled = true;
+            loadSecurityListRulesFallback(null);
+        }
+    });
+
+    document.getElementById('securityListSelect')?.addEventListener('change', () => {
+        loadSecurityListRulesFallback(document.getElementById('securityListSelect')?.value);
+    });
+
+    document.getElementById('addIngressRuleBtn')?.addEventListener('click', () => {
+        const ingressRulesTable = document.getElementById('ingressRulesTable');
+        const placeholder = ingressRulesTable?.querySelector('td[colspan="5"]');
+        if (placeholder) placeholder.parentElement.remove();
+        ingressRulesTable?.appendChild(createNetworkRuleRowFallback('ingress'));
+    });
+
+    document.getElementById('addEgressRuleBtn')?.addEventListener('click', () => {
+        const egressRulesTable = document.getElementById('egressRulesTable');
+        const placeholder = egressRulesTable?.querySelector('td[colspan="5"]');
+        if (placeholder) placeholder.parentElement.remove();
+        egressRulesTable?.appendChild(createNetworkRuleRowFallback('egress'));
+    });
+
+    document.getElementById('openFirewallBtn')?.addEventListener('click', () => {
+        const ingressRulesTable = document.getElementById('ingressRulesTable');
+        const egressRulesTable = document.getElementById('egressRulesTable');
+        const currentIngressRules = collectNetworkRulesFallback(ingressRulesTable, 'ingress');
+        const ingressExists = currentIngressRules.some(rule => rule.protocol === 'all' && rule.source === '0.0.0.0/0');
+        let ingressAdded = false;
+        let egressAdded = false;
+        if (!ingressExists) {
+            const placeholder = ingressRulesTable?.querySelector('td[colspan="5"]');
+            if (placeholder) placeholder.parentElement.remove();
+            ingressRulesTable?.appendChild(createNetworkRuleRowFallback('ingress', { source: '0.0.0.0/0', protocol: 'all', is_stateless: false }));
+            ingressAdded = true;
+        }
+        const currentEgressRules = collectNetworkRulesFallback(egressRulesTable, 'egress');
+        const egressExists = currentEgressRules.some(rule => rule.protocol === 'all' && rule.destination === '0.0.0.0/0');
+        if (!egressExists) {
+            const placeholder = egressRulesTable?.querySelector('td[colspan="5"]');
+            if (placeholder) placeholder.parentElement.remove();
+            egressRulesTable?.appendChild(createNetworkRuleRowFallback('egress', { destination: '0.0.0.0/0', protocol: 'all', is_stateless: false }));
+            egressAdded = true;
+        }
+        const firewallMessage = ingressAdded || egressAdded
+            ? `已添加${ingressAdded && egressAdded ? '入站和出站' : (ingressAdded ? '入站' : '出站')}允许所有规则，请点击“保存更改”生效。`
+            : '允许所有的入站/出站规则已存在，无需重复添加。';
+        const networkRulesSpinner = document.getElementById('networkRulesSpinner');
+        if (networkRulesSpinner) {
+            networkRulesSpinner.classList.remove('d-none');
+            window.setTimeout(() => networkRulesSpinner.classList.add('d-none'), 600);
+        }
+        window.alert(firewallMessage);
+    });
+
+    document.getElementById('saveNetworkRulesBtn')?.addEventListener('click', async () => {
+        const securityListSelect = document.getElementById('securityListSelect');
+        const ingressRulesTable = document.getElementById('ingressRulesTable');
+        const egressRulesTable = document.getElementById('egressRulesTable');
+        const saveNetworkRulesBtn = document.getElementById('saveNetworkRulesBtn');
+        const slId = securityListSelect?.value;
+        if (!slId) return;
+        const ingressRules = collectNetworkRulesFallback(ingressRulesTable, 'ingress');
+        const egressRules = collectNetworkRulesFallback(egressRulesTable, 'egress');
+        const spinner = saveNetworkRulesBtn?.querySelector('.spinner-border');
+        if (saveNetworkRulesBtn) saveNetworkRulesBtn.disabled = true;
+        spinner?.classList.remove('d-none');
+        try {
+            const response = await fetch('/oci/api/network/update-security-rules', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    security_list_id: slId,
+                    rules: {
+                        ingress_security_rules: ingressRules,
+                        egress_security_rules: egressRules
+                    }
+                })
+            });
+            if (!response.ok) throw new Error('save network rules failed');
+            await loadSecurityListRulesFallback(slId);
+        } catch (error) {
+            console.warn('fallback save network rules failed:', error);
+        } finally {
+            if (saveNetworkRulesBtn) saveNetworkRulesBtn.disabled = false;
+            spinner?.classList.add('d-none');
+        }
+    });
+
+    if (viewSnatchTasksBtn && !viewSnatchTasksBtn.dataset.originalSnatchBound) {
+        viewSnatchTasksBtn.dataset.originalSnatchBound = '1';
+        viewSnatchTasksBtn.addEventListener('click', () => {
+            const runningTabBtn = document.getElementById('running-tab');
+            const completedTabBtn = document.getElementById('completed-tab');
+            const runningPane = document.getElementById('running-tab-pane');
+            const completedPane = document.getElementById('completed-tab-pane');
+            const runningActions = document.getElementById('running-actions');
+            const completedActions = document.getElementById('completed-actions');
+            const runningDeleteAction = document.getElementById('running-delete-action');
+            const snatchLogArea = document.getElementById('snatchLogArea');
+
+            runningTabBtn?.classList.add('active');
+            completedTabBtn?.classList.remove('active');
+            runningPane?.classList.add('show', 'active');
+            completedPane?.classList.remove('show', 'active');
+
+            if (runningActions) runningActions.style.display = 'flex';
+            if (completedActions) completedActions.style.display = 'none';
+            if (runningDeleteAction) runningDeleteAction.style.display = 'block';
+            if (snatchLogArea) snatchLogArea.style.display = 'block';
+
+            if (typeof window.loadSnatchTasks === 'function') {
+                window.loadSnatchTasks();
+            }
+        });
+    }
+
+    cloudflareSettingsBtn?.addEventListener('click', async () => {
+        hideModalById('networkConfigHubModal');
+        try {
+            const response = await fetch('/oci/api/cloudflare-config', { credentials: 'same-origin' });
+            if (response.ok) {
+                const config = await response.json();
+                if (cloudflareApiTokenInput) cloudflareApiTokenInput.value = config.api_token || '';
+                if (cloudflareZoneIdInput) cloudflareZoneIdInput.value = config.zone_id || '';
+                if (cloudflareDomainInput) cloudflareDomainInput.value = config.domain || '';
+            }
+        } catch (error) {
+            console.warn('fallback cloudflare config failed:', error);
+        }
+        window.setTimeout(() => showModalById('cloudflareSettingsModal'), 200);
+    });
+
+    tgSettingsBtn?.addEventListener('click', async () => {
+        hideModalById('networkConfigHubModal');
+        try {
+            const [tgRes, xuiRes] = await Promise.all([
+                fetch('/oci/api/tg-config', { credentials: 'same-origin' }),
+                fetch('/oci/api/xui-config', { credentials: 'same-origin' })
+            ]);
+            if (tgRes.ok) {
+                const config = await tgRes.json();
+                if (tgBotTokenInput) tgBotTokenInput.value = config.bot_token || '';
+                if (tgChatIdInput) tgChatIdInput.value = config.chat_id || '';
+            }
+            if (xuiRes.ok) {
+                const config = await xuiRes.json();
+                if (xuiManagerUrlInput) xuiManagerUrlInput.value = config.manager_url || '';
+                if (xuiManagerSecretInput) xuiManagerSecretInput.value = config.manager_secret || '';
+            }
+        } catch (error) {
+            console.warn('fallback tg/xui config failed:', error);
+        }
+        window.setTimeout(() => showModalById('tgSettingsModal'), 200);
+    });
+
+    window.setTimeout(renderFallbackProfiles, 1200);
+});
+</script>
+{% endblock %}

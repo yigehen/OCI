@@ -1,0 +1,37 @@
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+
+  web:
+    build: .
+    restart: unless-stopped
+    command: gunicorn --workers 3 --bind 0.0.0.0:5000 app:app
+    env_file:
+      - .env
+    environment:
+      APP_DATA_DIR: /app/data
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      - redis
+
+  worker:
+    build: .
+    restart: unless-stopped
+    command: celery -A app_pkg.celery_app.celery worker --pool=threads --concurrency=100 --loglevel=info
+    env_file:
+      - .env
+    environment:
+      APP_DATA_DIR: /app/data
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      - redis
+
+volumes:
+  redis_data:

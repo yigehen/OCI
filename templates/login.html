@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud Manager - 登录</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='ui_theme.css') }}">
+</head>
+<body>
+    <div class="cm-login-page">
+        <div class="cm-login-grid">
+            <section class="cm-login-hero">
+                <div>
+                    <div class="cm-login-badge">
+                        <i class="bi bi-stars"></i>
+                        Unified Multi-Cloud Console
+                    </div>
+                    <h1 class="cm-login-title">
+                        Cloud Manager
+                        <span>科技控制中心</span>
+                    </h1>
+                    <p class="cm-login-desc">
+                        面向 OCI 的全功能科技控制台，整合账户管理、实例运维、抢占任务、网络规则、通知与自动化能力。
+                    </p>
+                </div>
+
+                <div>
+                    <div class="cm-login-metrics">
+                        <div class="cm-login-metric">
+                            <div class="value">OCI</div>
+                            <div class="label">Profiles / Region / Proxy</div>
+                        </div>
+                        <div class="cm-login-metric">
+                            <div class="value">Tasks</div>
+                            <div class="label">Snatch / Queue / Recovery</div>
+                        </div>
+                        <div class="cm-login-metric">
+                            <div class="value">Ops</div>
+                            <div class="label">Network / Cloudflare / TG</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="cm-login-card">
+                <div class="cm-login-panel">
+                    <div class="cm-login-panel-header">
+                        <div class="cm-login-badge mb-3">
+                            <i class="bi bi-shield-lock-fill"></i>
+                            Secure Access
+                        </div>
+                        <h2 class="cm-login-panel-title">管理员登录</h2>
+                        <p class="cm-login-panel-subtitle mb-0">请输入管理密码并完成安全验证</p>
+                    </div>
+
+                    <form method="post" id="loginForm">
+                        <div class="mb-3">
+                            <input type="password" class="form-control form-control-lg text-center cm-login-input" id="password" name="password" placeholder="请输入密码" required>
+                        </div>
+
+                        <input type="hidden" name="device_id" id="deviceIdInput">
+
+                        {% if mfa_enabled %}
+                            <div class="mb-3">
+                                <input type="text" class="form-control form-control-lg text-center cm-login-input" id="mfaCode" name="mfa_code" placeholder="------" autocomplete="off">
+                            </div>
+                            <div class="cm-login-help mb-4">
+                                <i class="bi bi-phone me-2"></i>请输入 6 位二次验证码，完成安全登录。
+                            </div>
+
+                            {% if error %}
+                                <div class="alert alert-danger mb-3 py-2" role="alert">{{ error }}</div>
+                            {% endif %}
+
+                            <button class="w-100 btn btn-lg btn-primary cm-login-btn" type="submit">
+                                <i class="bi bi-box-arrow-in-right me-2"></i>验证登录
+                            </button>
+                        {% else %}
+                            <div class="mb-3">
+                                <input type="text" class="form-control form-control-lg text-center cm-login-input" placeholder="请先设置 MFA" disabled>
+                            </div>
+                            <div class="cm-login-help mb-4">
+                                <i class="bi bi-shield-check me-2"></i>检测到当前账号未绑定 MFA，登录后将自动进入安全配置流程。
+                            </div>
+
+                            {% if error %}
+                                <div class="alert alert-danger mb-3 py-2" role="alert">{{ error }}</div>
+                            {% endif %}
+
+                            <button class="w-100 btn btn-lg btn-primary cm-login-btn" type="submit">
+                                <i class="bi bi-arrow-right-circle me-2"></i>登录并设置
+                            </button>
+                        {% endif %}
+
+                        <p class="cm-login-footnote">&copy; Powered by 小龙女她爸</p>
+                    </form>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            let deviceId = localStorage.getItem('fp_device_id');
+
+            if (!deviceId) {
+                deviceId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                    return v.toString(16);
+                });
+                localStorage.setItem('fp_device_id', deviceId);
+            }
+
+            document.cookie = "fp_device_id=" + deviceId + "; path=/; max-age=315360000";
+            document.getElementById('deviceIdInput').value = deviceId;
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>绑定二次验证</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f5f5f5; padding-top: 40px; }
+        .card { max-width: 500px; margin: 0 auto; box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15); }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="card">
+        <div class="card-header bg-primary text-white text-center">
+            <h4>🔒 安全设置：绑定二次验证 (MFA)</h4>
+        </div>
+        <div class="card-body text-center">
+            <p class="card-text">为了您的账户安全，请使用 <strong>Google Authenticator</strong> 或 <strong>Microsoft Authenticator</strong> 扫描下方二维码。</p>
+            
+            <div class="mb-4">
+                <img src="data:image/png;base64,{{ qr_code }}" alt="MFA QR Code" class="img-fluid border p-2">
+            </div>
+            
+            <p class="text-muted small">无法扫描？请手动输入密钥：<br><code class="fs-5">{{ secret }}</code></p>
+            
+            <form method="POST">
+                <div class="mb-3">
+                    <input type="text" name="code" class="form-control form-control-lg text-center" placeholder="请输入显示的 6 位验证码" required autocomplete="off">
+                </div>
+                {% if error %}
+                <div class="alert alert-danger">{{ error }}</div>
+                {% endif %}
+                <button type="submit" class="btn btn-success w-100 btn-lg">验证并启用</button>
+            </form>
+        </div>
+    </div>
+</div>
+</body>
+</html>
